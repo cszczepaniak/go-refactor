@@ -1,0 +1,10 @@
+package basic
+
+func ReplaceMe(a, b, c int) bool {
+	return false
+}
+
+func foobar() {
+	r := ExampleReplacement // want "replace the function call"
+	_ = r
+}

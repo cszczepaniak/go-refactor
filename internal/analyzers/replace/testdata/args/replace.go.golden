@@ -1,0 +1,12 @@
+package basic
+
+import "fmt"
+
+func ReplaceMe(a string, b bool) bool {
+	return false
+}
+
+func foobar() {
+	r := Replaced(true != false, fmt.Sprint("abc")) // want "replace the function call"
+	_ = r
+}
