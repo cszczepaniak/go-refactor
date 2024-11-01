@@ -12,7 +12,7 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-func New() *analysis.Analyzer {
+func New(dummy string) *analysis.Analyzer {
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	function := flagSet.String("func", "", "The function to replace. Format is 'github.com/package/path.FunctionName'")
 	replacement := flagSet.String("replacement", "", "The replacement string. Placeholders are available (like $arg0).")

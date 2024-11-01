@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	singlechecker.Main(replace.New())
+	singlechecker.Main(replace.New("oops"))
 }
