@@ -1,6 +1,7 @@
 package replace
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -22,6 +23,10 @@ func New(dummy string) *analysis.Analyzer {
 		Doc:   "Replace a function call with something else.",
 		Flags: *flagSet,
 		Run: func(pass *analysis.Pass) (interface{}, error) {
+			if *function == "" {
+				return nil, errors.New("function is required")
+			}
+
 			dot := strings.LastIndex(*function, ".")
 			if dot < 0 {
 				return nil, fmt.Errorf("function must be a package path and a name separated by a period, e.g. github.com/a.Function (had %s)", *function)
