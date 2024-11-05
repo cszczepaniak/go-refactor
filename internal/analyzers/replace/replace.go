@@ -3,8 +3,8 @@ package replace
 import (
 	"errors"
 	"flag"
-	"fmt"
 	"go/ast"
+	"go/types"
 	"os"
 	"strings"
 
@@ -28,13 +28,10 @@ func New(dummy string) *analysis.Analyzer {
 				return nil, errors.New("function is required")
 			}
 
-			dot := strings.LastIndex(*function, ".")
-			if dot < 0 {
-				return nil, fmt.Errorf("function must be a package path and a name separated by a period, e.g. github.com/a.Function (had %s)", *function)
+			parsedFunc, err := parseFunction(*function)
+			if err != nil {
+				return nil, err
 			}
-
-			pkg := (*function)[:dot]
-			function := (*function)[dot+1:]
 
 			r, err := parseReplacement(*replacement)
 			if err != nil {
@@ -64,7 +61,7 @@ func New(dummy string) *analysis.Analyzer {
 					}
 
 					obj := pass.TypesInfo.ObjectOf(name)
-					if obj == nil || obj.Name() != function || obj.Pkg().Path() != pkg {
+					if !parsedFunc.matchesTopLevel(obj) {
 						return true
 					}
 
@@ -98,4 +95,40 @@ func New(dummy string) *analysis.Analyzer {
 			inspect.Analyzer,
 		},
 	}
+}
+
+type funcSpec struct {
+	pkg  string
+	recv string
+	name string
+}
+
+func (s funcSpec) matchesTopLevel(obj types.Object) bool {
+	return obj != nil && obj.Name() == s.name && obj.Pkg().Path() == s.pkg
+}
+
+func parseFunction(input string) (funcSpec, error) {
+	dot := strings.LastIndex(input, ".")
+	if dot == -1 {
+		return funcSpec{}, errors.New("function must be of form <package path>.<receiver (optional)>.<name>")
+	}
+
+	rest, name := input[:dot], input[dot+1:]
+	slash := strings.LastIndex(rest, "/")
+	dot = strings.LastIndex(rest, ".")
+
+	if slash > dot {
+		// The only dots are in the package path, there is no receiver name.
+		return funcSpec{
+			pkg:  rest,
+			name: name,
+		}, nil
+	}
+
+	pkg, recv := input[:dot], input[dot+1:]
+	return funcSpec{
+		pkg:  pkg,
+		recv: recv,
+		name: name,
+	}, nil
 }
