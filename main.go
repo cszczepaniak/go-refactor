@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/cszczepaniak/go-refactor/internal/driver/driver"
 	"github.com/urfave/cli/v2"
@@ -33,30 +34,7 @@ func main() {
 					Required: true,
 				},
 			},
-			Action: func(ctx *cli.Context) error {
-				d, ok := ctx.Context.Value("driver").(driver.Driver)
-				if !ok {
-					return errors.New("dev error: driver not found")
-				}
-
-				out, err := d.Execute(
-					"replace",
-					map[string]string{
-						"func":        ctx.String("func"),
-						"replacement": ctx.String("replacement"),
-					},
-					ctx.Args().Slice(),
-				)
-				if err != nil {
-					return err
-				}
-
-				if ctx.Bool("verbose") {
-					fmt.Printf("%d issues found and fixed\n", out.Count)
-				}
-
-				return nil
-			},
+			Action: subcommand("replace"),
 		}},
 		Before: func(c *cli.Context) error {
 			d, err := driver.Setup()
@@ -73,5 +51,43 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func subcommand(name string) func(*cli.Context) error {
+	return func(cctx *cli.Context) error {
+		d, ok := cctx.Context.Value("driver").(driver.Driver)
+		if !ok {
+			return errors.New("dev error: driver not found")
+		}
+
+		flags := make(map[string]string, len(cctx.Command.Flags))
+		for _, f := range cctx.Command.Flags {
+			switch f := f.(type) {
+			case *cli.StringFlag:
+				flags[f.Name] = f.Value
+			case *cli.IntFlag:
+				flags[f.Name] = strconv.Itoa(f.Value)
+			case *cli.BoolFlag:
+				flags[f.Name] = strconv.FormatBool(f.Value)
+			default:
+				return fmt.Errorf("unsupported flag type: %T", f)
+			}
+		}
+
+		out, err := d.Execute(
+			name,
+			flags,
+			cctx.Args().Slice(),
+		)
+		if err != nil {
+			return err
+		}
+
+		if cctx.Bool("verbose") {
+			fmt.Printf("%d issues found and fixed\n", out.Count)
+		}
+
+		return nil
 	}
 }
