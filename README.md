@@ -32,5 +32,6 @@ There are metavariables available within the replacement string. The table below
 
 
 ## `move`
-`move` is used to move a type (and all of its methods, and optionally constructors) to a new package.
+`move` is used to move a type (and all of its methods, and optionally constructors) to a different
+package and updates all references elsewhere to refer to it by its new name.
 ...it's not currently implemented.
