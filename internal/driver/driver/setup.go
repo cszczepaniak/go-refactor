@@ -54,6 +54,9 @@ type Result struct {
 }
 
 func (r *Result) Output() string {
+	if r.output == nil {
+		return ""
+	}
 	return r.output.String()
 }
 
