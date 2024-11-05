@@ -84,14 +84,30 @@ func doTypeReplacement(
 ) error {
 	var err error
 	inspector.WithStack(
-		[]ast.Node{&ast.SelectorExpr{}},
+		[]ast.Node{&ast.SelectorExpr{}, &ast.Ident{}},
 		func(n ast.Node, push bool, stack []ast.Node) bool {
 			if !push {
 				return false
 			}
 
-			sel := n.(*ast.SelectorExpr)
-			obj := pass.TypesInfo.ObjectOf(sel.Sel)
+			var name *ast.Ident
+			switch n := n.(type) {
+			case *ast.SelectorExpr:
+				name = n.Sel
+			case *ast.Ident:
+				// If we have an identifier, let's make sure we're not the name of a type spec. If
+				// we are, we shouldn't replace this one because our goal isn't to remove the old
+				// type spec, just to replace all of its usages.
+				if _, ok := stack[len(stack)-2].(*ast.TypeSpec); ok {
+					return true
+				}
+
+				name = n
+			default:
+				panic("unreachable")
+			}
+
+			obj := pass.TypesInfo.ObjectOf(name)
 
 			switch {
 			case spec.matchesTopLevelSymbol(obj):
@@ -107,7 +123,7 @@ func doTypeReplacement(
 
 				err = analyzeutil.ReplaceNode(
 					pass,
-					sel,
+					n,
 					replacementStr,
 				)
 
