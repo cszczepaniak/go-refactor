@@ -29,9 +29,24 @@ func main() {
 		Commands: []*cli.Command{{
 			Name: "replace",
 			Flags: []cli.Flag{
+				// One of func or type must be supplied.
 				&cli.StringFlag{
 					Name:     "func",
-					Required: true,
+					Required: false,
+				},
+				&cli.StringFlag{
+					Name:     "type",
+					Required: false,
+				},
+				&cli.StringFlag{
+					Name:     "package",
+					Required: false,
+					Usage:    "Specifies the name of the package to import/select from when replacing a type. Has no effect if --func is specified.",
+				},
+				&cli.StringFlag{
+					Name:     "alias-type-replacement",
+					Required: false,
+					Usage:    "If replacing a type, specifies whether or not the value for --package should be added as an alias to the import",
 				},
 				&cli.StringFlag{
 					Name:     "replacement",
