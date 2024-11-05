@@ -185,19 +185,13 @@ func doTypeReplacement(
 ) error {
 	var err error
 	inspector.WithStack(
-		[]ast.Node{&ast.Field{}},
+		[]ast.Node{&ast.SelectorExpr{}},
 		func(n ast.Node, push bool, stack []ast.Node) bool {
 			if !push {
 				return false
 			}
 
-			field := n.(*ast.Field)
-
-			sel, ok := field.Type.(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
-
+			sel := n.(*ast.SelectorExpr)
 			obj := pass.TypesInfo.ObjectOf(sel.Sel)
 
 			switch {
@@ -208,7 +202,7 @@ func doTypeReplacement(
 				}
 
 				importer.Add(pass.Fset, stack[0].(*ast.File), name, replacement.pkg)
-				err = analyzeutil.ReplaceNode(pass, field.Type, replacementPackageName+"."+replacement.name)
+				err = analyzeutil.ReplaceNode(pass, sel, replacementPackageName+"."+replacement.name)
 
 				// Whether or not there's an error, there's no need to descend further into a Field.
 				return false
