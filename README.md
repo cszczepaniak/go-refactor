@@ -2,6 +2,9 @@
 `go-refactor` is a tool used for refactoring Go code. Its aim is to automate common refactoring
 tasks that are a little more involved than just a simple find/replace.
 
+## Installation
+Currently, the best way to install `go-refactor` is to clone the repository and run `make install`.
+
 ## `replace`
 `replace` is used to replace a function call with some transformation of it. See example usages
 below.

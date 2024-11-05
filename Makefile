@@ -5,3 +5,6 @@ driver:
 
 build: driver
 	go build
+
+install: driver
+	go install
