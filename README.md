@@ -5,8 +5,7 @@ tasks that are a little more involved than just a simple find/replace.
 ## Installation
 Currently, the best way to install `go-refactor` is to clone the repository and run `make install`.
 
-Supported Refactorings
----------------------------------
+# Supported Refactorings
 
 ## `replace`
 `replace` is used to replace a function call with some transformation of it. See example usages
