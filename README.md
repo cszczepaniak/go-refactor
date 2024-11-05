@@ -9,12 +9,12 @@ below.
 ```shell
 # The arguments are available as metavariables.
 go-refactor replace --func github.com/cszczepaniak/go-refactor/internal/analyzers/replace.New
---replacement 'NewWithAnotherArg("another argument", $arg0)'
+--replacement 'NewWithAnotherArg("another argument", $arg0)' ./...
 
 # You can also specify that a new import is needed. This will add
 # "github.com/cszczepaniak/another/pkg" as an import and expand to "pkgname."
 go-refactor replace --func github.com/cszczepaniak/go-refactor/internal/analyzers/replace.New
---replacement '$pkg(github.com/cszczepaniak/another/pkg,pkgname).New($arg0)'
+--replacement '$pkg(github.com/cszczepaniak/another/pkg,pkgname).New($arg0)' ./...
 ```
 
 There are metavariables available within the replacement string. The table below enumerates them.
