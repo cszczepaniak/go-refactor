@@ -113,11 +113,8 @@ func subcommand(name string) func(*cli.Context) error {
 			return err
 		}
 
-		if cctx.Count("verbose") > 1 {
-			fmt.Println(out.Output())
-		}
-
 		if cctx.Bool("verbose") || cctx.Bool("dry-run") {
+			fmt.Println(out.Output())
 			fmt.Printf("%d issues found and fixed\n", out.Count)
 		}
 
