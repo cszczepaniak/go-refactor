@@ -1,39 +1,70 @@
 package main
 
 import (
+	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
+
+	"github.com/cszczepaniak/go-refactor/internal/driver/driver"
+	"github.com/urfave/cli/v2"
 )
 
-//go:embed bin/driver
-var exe []byte
-
 func main() {
-	// Because of the limited flexibility of analysis/multichecker, we're going to embed it in this
-	// executable and run it from a subprocess. This allows us to better manipulate
-	// stdout/stderr/the exit code. The cost is that building this program is a lot more complicated
-	// and precludes building via go install; instead, users will have to clone this repo and run
-	// the custom build target in the Makefile.
-	td, err := os.MkdirTemp("", "")
-	if err != nil {
-		panic(err)
-	}
-	defer os.RemoveAll(td)
+	app := &cli.App{
+		Name: "go-refactor",
+		Args: true,
+		Commands: []*cli.Command{{
+			Name: "replace",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:     "func",
+					Required: true,
+				},
+				&cli.StringFlag{
+					Name:     "replacement",
+					Required: true,
+				},
+			},
+			Action: func(ctx *cli.Context) error {
+				d, ok := ctx.Context.Value("driver").(driver.Driver)
+				if !ok {
+					return errors.New("dev error: driver not found")
+				}
 
-	driver := filepath.Join(td, "go_refactoring_driver")
-	// TODO ModePerm is very permissive
-	err = os.WriteFile(driver, exe, os.ModePerm)
-	if err != nil {
-		panic(err)
+				fmt.Println("ARGS", ctx.Args().Slice())
+
+				out, err := d.Execute(
+					"replace",
+					map[string]string{
+						"func":        ctx.String("func"),
+						"replacement": ctx.String("replacement"),
+					},
+					ctx.Args().Slice(),
+				)
+				if err != nil {
+					return err
+				}
+
+				fmt.Println(out)
+				return nil
+			},
+		}},
+		Before: func(c *cli.Context) error {
+			d, err := driver.Setup()
+			if err != nil {
+				return err
+			}
+
+			c.Context = context.WithValue(c.Context, "driver", d)
+			return nil
+		},
 	}
 
-	out, err := exec.Command(driver, "./...").CombinedOutput()
-	fmt.Println(string(out))
+	err := app.Run(os.Args)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
 	}
-	fmt.Println(string(out))
 }

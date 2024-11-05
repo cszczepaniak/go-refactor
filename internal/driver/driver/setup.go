@@ -41,12 +41,13 @@ func Setup() (Driver, error) {
 	return d, nil
 }
 
-func (d Driver) Execute(subcmd string, args map[string]string) (string, error) {
-	preparedArgs := make([]string, 0, len(args)*2+2)
+func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (string, error) {
+	preparedArgs := make([]string, 0, len(flags)*2+2+len(args))
 	preparedArgs = append(preparedArgs, "-"+subcmd, "-fix")
-	for k, v := range args {
+	for k, v := range flags {
 		preparedArgs = append(preparedArgs, "-"+subcmd+"."+k, v)
 	}
+	preparedArgs = append(preparedArgs, args...)
 
 	out, err := exec.Command(d.exePath, preparedArgs...).CombinedOutput()
 	if err != nil {
