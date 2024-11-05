@@ -61,9 +61,6 @@ func (r *Result) Write(b []byte) (int, error) {
 	if r.output == nil {
 		r.output = &strings.Builder{}
 	}
-	if r.Count == 0 {
-		r.Count++
-	}
 	r.Count += bytes.Count(b, []byte{'\n'})
 	return r.output.Write(b)
 }
@@ -77,10 +74,9 @@ func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (
 	preparedArgs = append(preparedArgs, args...)
 
 	output := &Result{}
-	stderr := &strings.Builder{}
 	cmd := exec.Command(d.exePath, preparedArgs...)
 	cmd.Stdout = output
-	cmd.Stderr = stderr
+	cmd.Stderr = output
 
 	err := cmd.Start()
 	if err != nil {
@@ -100,7 +96,7 @@ func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (
 		// something to fix).
 		return output, nil
 	default:
-		return nil, fmt.Errorf("error running driver: %s", stderr)
+		return nil, fmt.Errorf("error running driver: %s", output.Output())
 	}
 }
 
