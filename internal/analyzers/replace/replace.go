@@ -43,9 +43,9 @@ func New(dummy string) *analysis.Analyzer {
 
 			inspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
-			inspector.Nodes(
+			inspector.WithStack(
 				[]ast.Node{&ast.CallExpr{}},
-				func(n ast.Node, push bool) bool {
+				func(n ast.Node, push bool, stack []ast.Node) bool {
 					if !push {
 						return false
 					}
@@ -73,27 +73,10 @@ func New(dummy string) *analysis.Analyzer {
 						return false
 					}
 
-					var msg string
-					msg, err = analyzeutil.PrintReplacement(pass.Fset, callExpr, replacement)
+					err = analyzeutil.ReplaceNode(pass, callExpr, replacement)
 					if err != nil {
 						return false
 					}
-
-					pass.Report(
-						analysis.Diagnostic{
-							Pos:     callExpr.Pos(),
-							End:     callExpr.End(),
-							Message: msg,
-							SuggestedFixes: []analysis.SuggestedFix{{
-								Message: msg,
-								TextEdits: []analysis.TextEdit{{
-									Pos:     callExpr.Pos(),
-									End:     callExpr.End(),
-									NewText: []byte(replacement),
-								}},
-							}},
-						},
-					)
 
 					return true
 				},
