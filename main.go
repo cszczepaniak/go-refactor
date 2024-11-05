@@ -61,15 +61,33 @@ func subcommand(name string) func(*cli.Context) error {
 			return errors.New("dev error: driver not found")
 		}
 
+		globalFlagNames := make(map[string]struct{}, len(cctx.App.Flags))
+		for _, f := range cctx.App.Flags {
+			for _, n := range f.Names() {
+				globalFlagNames[n] = struct{}{}
+			}
+		}
+
 		flags := make(map[string]string, len(cctx.Command.Flags))
 		for _, f := range cctx.Command.Flags {
+			skip := false
+			for _, n := range f.Names() {
+				_, skip = globalFlagNames[n]
+				if skip {
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+
 			switch f := f.(type) {
 			case *cli.StringFlag:
-				flags[f.Name] = f.Value
+				flags[f.Name] = cctx.String(f.Name)
 			case *cli.IntFlag:
-				flags[f.Name] = strconv.Itoa(f.Value)
+				flags[f.Name] = strconv.Itoa(cctx.Int(f.Name))
 			case *cli.BoolFlag:
-				flags[f.Name] = strconv.FormatBool(f.Value)
+				flags[f.Name] = strconv.FormatBool(cctx.Bool(f.Name))
 			default:
 				return fmt.Errorf("unsupported flag type: %T", f)
 			}
