@@ -61,9 +61,6 @@ func New(dummy string) *analysis.Analyzer {
 					}
 
 					obj := pass.TypesInfo.ObjectOf(name)
-					if !parsedFunc.matchesTopLevel(obj) {
-						return true
-					}
 
 					switch {
 					case parsedFunc.matchesTopLevel(obj):
@@ -110,17 +107,30 @@ type funcSpec struct {
 }
 
 func (s funcSpec) matchesTopLevel(obj types.Object) bool {
-	return obj != nil && obj.Name() == s.name && obj.Pkg().Path() == s.pkg
+	return obj != nil && obj.Name() == s.name && obj.Pkg() != nil && obj.Pkg().Path() == s.pkg
 }
 
 func (s funcSpec) matchesReceiver(obj types.Object) bool {
+	if obj.Name() != s.name {
+		return false
+	}
+
 	sig, ok := obj.(*types.Func)
 	if !ok {
 		return false
 	}
 
 	recv := sig.Signature().Recv()
-	return recv != nil && recv.Pkg().Path() == s.pkg && recv.Name() == s.recv && obj.Name() == s.name
+	if recv == nil {
+		return false
+	}
+
+	recvTyp, ok := recv.Type().(*types.Named)
+	if !ok {
+		return false
+	}
+
+	return recvTyp.Obj().Pkg().Path() == s.pkg && recvTyp.Obj().Name() == s.recv
 }
 
 func parseFunction(input string) (funcSpec, error) {
@@ -141,7 +151,7 @@ func parseFunction(input string) (funcSpec, error) {
 		}, nil
 	}
 
-	pkg, recv := input[:dot], input[dot+1:]
+	pkg, recv := rest[:dot], rest[dot+1:]
 	return funcSpec{
 		pkg:  pkg,
 		recv: recv,
