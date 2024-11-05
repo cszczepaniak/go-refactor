@@ -7,6 +7,7 @@ import (
 
 func main() {
 	multichecker.Main(
-		replace.New(""),
+		replace.NewFuncReplacer(),
+		replace.NewTypeReplacer(),
 	)
 }

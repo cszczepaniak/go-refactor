@@ -7,7 +7,7 @@ import (
 )
 
 func TestReplace_Basic(t *testing.T) {
-	a := New("blah")
+	a := NewFuncReplacer()
 	a.Flags.Set("func", "test.com/module/basic.ReplaceMe")
 	a.Flags.Set("replacement", "ExampleReplacement")
 
@@ -15,7 +15,7 @@ func TestReplace_Basic(t *testing.T) {
 }
 
 func TestReplace_Args(t *testing.T) {
-	a := New("foobar")
+	a := NewFuncReplacer()
 	a.Flags.Set("func", "test.com/module/args.ReplaceMe")
 	a.Flags.Set("replacement", "Replaced($arg1, $arg0)")
 
