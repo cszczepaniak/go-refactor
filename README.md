@@ -21,7 +21,7 @@ There are metavariables available within the replacement string. The table below
 
 | Meta Variable | Value |
 | - | - |
-| `$argN` | The nth input argument of the function (0-indexed) |
+| `$arg<n>` | The nth input argument of the function (0-indexed). Examples: `$arg0`, `$arg11` |
 | `$recv` | The receiver of the function call. If the call has no receiver, it's an empty string. |
 | `$pkg(path,name)` | A symbol from another package. An import will be added for the package if needed. |
 | `$pkg(path,name,alias)` | A symbol from another package. An import with the given alias will be added for the package if needed. |
