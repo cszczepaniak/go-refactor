@@ -30,11 +30,11 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{{
-			Name: "replacefunc",
+			Name: "replacecall",
 			Flags: []cli.Flag{
 				&cli.StringFlag{
 					Name:     "func",
-					Required: false,
+					Required: true,
 				},
 				&cli.StringFlag{
 					Name:     "replacement",
@@ -42,14 +42,14 @@ func main() {
 				},
 			},
 			Action: func(cctx *cli.Context) error {
-				return runSubcommand(cctx, "replacefunc", nil)
+				return runSubcommand(cctx, "replacecall", nil)
 			},
 		}, {
 			Name: "replacetype",
 			Flags: []cli.Flag{
 				&cli.StringFlag{
 					Name:     "type",
-					Required: false,
+					Required: true,
 				},
 				&cli.StringFlag{
 					Name:     "import-alias",
