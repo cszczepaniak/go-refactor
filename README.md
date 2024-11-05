@@ -46,7 +46,8 @@ go-refactor replacetype \
     --type github.com/cszczepaniak/go-refactor/internal/analyzers/replace.TypeA \
     --replacement github.com/cszczepaniak/go-refactor/internal/analyzers/replace.TypeB ./...
 
-# Optionally specify an import alias to use when importing the package with the new type.
+# Optionally specify an import alias to use when importing the package with the new type. Note that
+# if a particular file already has an import for the new type's package, the alias will not be used.
 go-refactor replacetype \
     --type github.com/cszczepaniak/go-refactor/internal/analyzers/replace.TypeA \
     --replacement github.com/cszczepaniak/go-refactor/internal/analyzers/anotherpkg.TypeB \
