@@ -66,8 +66,20 @@ func (r *Result) Write(b []byte) (int, error) {
 }
 
 func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (*Result, error) {
+	return d.execute(subcmd, flags, args, false)
+
+}
+
+func (d Driver) Preview(subcmd string, flags map[string]string, args []string) (*Result, error) {
+	return d.execute(subcmd, flags, args, true)
+}
+
+func (d Driver) execute(subcmd string, flags map[string]string, args []string, dryrun bool) (*Result, error) {
 	preparedArgs := make([]string, 0, len(flags)*2+2+len(args))
-	preparedArgs = append(preparedArgs, "-"+subcmd, "-fix")
+	preparedArgs = append(preparedArgs, "-"+subcmd)
+	if !dryrun {
+		preparedArgs = append(preparedArgs, "-fix")
+	}
 	for k, v := range flags {
 		preparedArgs = append(preparedArgs, "-"+subcmd+"."+k, v)
 	}

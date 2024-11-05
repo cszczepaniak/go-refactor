@@ -21,6 +21,10 @@ func main() {
 				Name:    "verbose",
 				Aliases: []string{"v"},
 			},
+			&cli.BoolFlag{
+				Name:    "dry-run",
+				Aliases: []string{"d"},
+			},
 		},
 		Commands: []*cli.Command{{
 			Name: "replace",
@@ -93,7 +97,14 @@ func subcommand(name string) func(*cli.Context) error {
 			}
 		}
 
-		out, err := d.Execute(
+		var do func(string, map[string]string, []string) (*driver.Result, error)
+		if cctx.Bool("dry-run") {
+			do = d.Preview
+		} else {
+			do = d.Execute
+		}
+
+		out, err := do(
 			name,
 			flags,
 			cctx.Args().Slice(),
@@ -102,7 +113,7 @@ func subcommand(name string) func(*cli.Context) error {
 			return err
 		}
 
-		if cctx.Bool("verbose") {
+		if cctx.Bool("verbose") || cctx.Bool("dry-run") {
 			fmt.Printf("%d issues found and fixed\n", out.Count)
 		}
 
