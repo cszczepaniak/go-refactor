@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/format"
 	"go/token"
+	"iter"
 	"strconv"
 	"strings"
 	"unicode"
@@ -22,23 +23,54 @@ func parseReplacement(replacementStr string) (parsedReplacement, error) {
 			rest = rest[1:]
 
 			var metaName string
-			metaName, rest = parseMetaVarName(rest)
+			metaName, rest = takeWhile(rest, unicode.IsLetter)
 
 			// for now we only support argNNN
 			switch metaName {
 			case "arg":
-				end := 0
-				for end < len(rest) && unicode.IsDigit(rune(rest[end])) {
-					end++
-				}
+				var numStr string
+				numStr, rest = takeWhile(rest, unicode.IsDigit)
 
-				idx, err := strconv.Atoi(rest[:end])
+				idx, err := strconv.Atoi(numStr)
 				if err != nil {
 					return parsedReplacement{}, err
 				}
 
 				pr.replacers = append(pr.replacers, argReplacer{index: idx})
-				rest = rest[end:]
+			case "pkg":
+				var err error
+				rest, err = expectRune(rest, '(')
+				if err != nil {
+					return parsedReplacement{}, err
+				}
+
+				var pkg string
+				pkg, rest = takeWhile(rest, func(r rune) bool { return r != ',' })
+
+				rest, err = expectRune(rest, ',')
+				if err != nil {
+					return parsedReplacement{}, err
+				}
+
+				var name string
+				name, rest = takeWhile(rest, func(r rune) bool { return r != ',' && r != ')' })
+
+				var alias string
+				if rest[0] == ',' {
+					rest, _ = expectRune(rest, ',')
+					alias, rest = takeWhile(rest, func(r rune) bool { return r != ')' })
+				}
+
+				rest, err = expectRune(rest, ')')
+				if err != nil {
+					return parsedReplacement{}, err
+				}
+
+				pr.replacers = append(pr.replacers, packageReplacer{
+					path:  pkg,
+					name:  name,
+					alias: alias,
+				})
 			default:
 				return parsedReplacement{}, fmt.Errorf("malformed placeholder; expected $argNNN but got $%s", metaName)
 			}
@@ -58,17 +90,39 @@ func parseReplacement(replacementStr string) (parsedReplacement, error) {
 	return pr, nil
 }
 
-func parseMetaVarName(str string) (string, string) {
+func takeWhile(s string, fn func(r rune) bool) (string, string) {
 	end := 0
-	for end < len(str) && unicode.IsLetter(rune(str[end])) {
+	for end < len(s) && fn(rune(s[end])) {
 		end++
 	}
+	return s[:end], s[end:]
+}
 
-	return str[:end], str[end:]
+func expectRune(str string, r rune) (string, error) {
+	if str == "" {
+		return "", fmt.Errorf("expected %c but the string was empty", r)
+	}
+	if rune(str[0]) != r {
+		return "", fmt.Errorf("expected %c but got %c", r, str[0])
+	}
+
+	return str[1:], nil
 }
 
 type parsedReplacement struct {
 	replacers []replacer
+}
+
+func (pr parsedReplacement) imports() iter.Seq[packageReplacer] {
+	return func(yield func(packageReplacer) bool) {
+		for _, r := range pr.replacers {
+			if r, ok := r.(packageReplacer); ok {
+				if !yield(r) {
+					return
+				}
+			}
+		}
+	}
 }
 
 func (pr parsedReplacement) print(fset *token.FileSet, call *ast.CallExpr) (string, error) {
@@ -87,6 +141,16 @@ func (pr parsedReplacement) print(fset *token.FileSet, call *ast.CallExpr) (stri
 
 type replacer interface {
 	print(*token.FileSet, *ast.CallExpr) (string, error)
+}
+
+type packageReplacer struct {
+	path  string
+	name  string
+	alias string
+}
+
+func (pr packageReplacer) print(*token.FileSet, *ast.CallExpr) (string, error) {
+	return pr.name, nil
 }
 
 type constantReplacer string

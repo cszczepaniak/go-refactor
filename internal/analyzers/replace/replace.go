@@ -41,6 +41,7 @@ func New(dummy string) *analysis.Analyzer {
 				return nil, err
 			}
 
+			importer := &analyzeutil.Importer{}
 			inspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
 			inspector.WithStack(
@@ -78,12 +79,18 @@ func New(dummy string) *analysis.Analyzer {
 						return false
 					}
 
+					for imp := range r.imports() {
+						importer.Add(pass.Fset, stack[0].(*ast.File), imp.alias, imp.path)
+					}
+
 					return true
 				},
 			)
 			if err != nil {
 				return nil, err
 			}
+
+			importer.Rewrite(pass)
 
 			return nil, nil
 		},
