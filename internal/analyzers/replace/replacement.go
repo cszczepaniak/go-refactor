@@ -21,25 +21,28 @@ func parseReplacement(replacementStr string) (parsedReplacement, error) {
 			// meta vars start with $
 			rest = rest[1:]
 
+			var metaName string
+			metaName, rest = parseMetaVarName(rest)
+
 			// for now we only support argNNN
-			if len(rest) < 4 || rest[:3] != "arg" {
-				return parsedReplacement{}, errors.New("malformed placeholder; expected $argNNN")
+			switch metaName {
+			case "arg":
+				end := 0
+				for end < len(rest) && unicode.IsDigit(rune(rest[end])) {
+					end++
+				}
+
+				idx, err := strconv.Atoi(rest[:end])
+				if err != nil {
+					return parsedReplacement{}, err
+				}
+
+				pr.replacers = append(pr.replacers, argReplacer{index: idx})
+				rest = rest[end:]
+			default:
+				return parsedReplacement{}, fmt.Errorf("malformed placeholder; expected $argNNN but got $%s", metaName)
 			}
 
-			rest = rest[3:]
-
-			end := 0
-			for end < len(rest) && unicode.IsDigit(rune(rest[end])) {
-				end++
-			}
-
-			idx, err := strconv.Atoi(rest[:end])
-			if err != nil {
-				return parsedReplacement{}, err
-			}
-
-			pr.replacers = append(pr.replacers, argReplacer{index: idx})
-			rest = rest[end:]
 			continue
 		}
 
@@ -53,6 +56,15 @@ func parseReplacement(replacementStr string) (parsedReplacement, error) {
 	}
 
 	return pr, nil
+}
+
+func parseMetaVarName(str string) (string, string) {
+	end := 0
+	for end < len(str) && unicode.IsLetter(rune(str[end])) {
+		end++
+	}
+
+	return str[:end], str[end:]
 }
 
 type parsedReplacement struct {
