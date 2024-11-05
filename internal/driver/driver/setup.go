@@ -78,6 +78,10 @@ func (d Driver) Preview(subcmd string, flags map[string]string, args []string) (
 }
 
 func (d Driver) execute(subcmd string, flags map[string]string, args []string, dryrun bool) (*Result, error) {
+	if len(args) == 0 {
+		return nil, errors.New("must provide at least one argument specifying a package path to run the tool over")
+	}
+
 	preparedArgs := make([]string, 0, len(flags)+2+len(args))
 	preparedArgs = append(preparedArgs, "-"+subcmd)
 	if !dryrun {
