@@ -75,13 +75,13 @@ func (d Driver) Preview(subcmd string, flags map[string]string, args []string) (
 }
 
 func (d Driver) execute(subcmd string, flags map[string]string, args []string, dryrun bool) (*Result, error) {
-	preparedArgs := make([]string, 0, len(flags)*2+2+len(args))
+	preparedArgs := make([]string, 0, len(flags)+2+len(args))
 	preparedArgs = append(preparedArgs, "-"+subcmd)
 	if !dryrun {
 		preparedArgs = append(preparedArgs, "-fix")
 	}
 	for k, v := range flags {
-		preparedArgs = append(preparedArgs, "-"+subcmd+"."+k, v)
+		preparedArgs = append(preparedArgs, "-"+subcmd+"."+k+"="+v)
 	}
 	preparedArgs = append(preparedArgs, args...)
 

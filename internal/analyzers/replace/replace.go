@@ -94,11 +94,15 @@ func New(dummy string) *analysis.Analyzer {
 				if err != nil {
 					return nil, fmt.Errorf("error parsing type replacement (must be a package + symbol): %w", err)
 				}
-				alias := flags.typeReplacementPackage
-				if !flags.aliasTypeReplacement {
-					alias = ""
-				}
-				err = doTypeReplacement(pass, spec, replacement, alias, inspector, importer)
+				err = doTypeReplacement(
+					pass,
+					spec,
+					replacement,
+					flags.typeReplacementPackage,
+					flags.aliasTypeReplacement,
+					inspector,
+					importer,
+				)
 			default:
 				return nil, errors.New("dev error: unknown case")
 			}
@@ -175,6 +179,7 @@ func doTypeReplacement(
 	spec symbolSpec,
 	replacement symbolSpec,
 	replacementPackageName string,
+	shouldUseImportAlias bool,
 	inspector *inspector.Inspector,
 	importer *analyzeutil.Importer,
 ) error {
@@ -197,7 +202,12 @@ func doTypeReplacement(
 
 			switch {
 			case spec.matchesTopLevelSymbol(obj):
-				importer.Add(pass.Fset, stack[0].(*ast.File), replacementPackageName, replacement.pkg)
+				name := ""
+				if shouldUseImportAlias {
+					name = replacementPackageName
+				}
+
+				importer.Add(pass.Fset, stack[0].(*ast.File), name, replacement.pkg)
 				err = analyzeutil.ReplaceNode(pass, field.Type, replacementPackageName+"."+replacement.name)
 
 				// Whether or not there's an error, there's no need to descend further into a Field.

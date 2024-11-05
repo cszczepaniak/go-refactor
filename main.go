@@ -102,7 +102,10 @@ func subcommand(name string) func(*cli.Context) error {
 
 			switch f := f.(type) {
 			case *cli.StringFlag:
-				flags[f.Name] = cctx.String(f.Name)
+				val := cctx.String(f.Name)
+				if val != "" {
+					flags[f.Name] = val
+				}
 			case *cli.IntFlag:
 				flags[f.Name] = strconv.Itoa(cctx.Int(f.Name))
 			case *cli.BoolFlag:
