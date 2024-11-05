@@ -19,7 +19,7 @@ type Importer struct {
 	filesByName map[string]importModification
 }
 
-func (imp *Importer) Add(fset *token.FileSet, f *ast.File, name, path string) {
+func (imp *Importer) Add(fset *token.FileSet, f *ast.File, name, path string) string {
 	if imp.filesByName == nil {
 		imp.filesByName = make(map[string]importModification)
 	}
@@ -42,8 +42,22 @@ func (imp *Importer) Add(fset *token.FileSet, f *ast.File, name, path string) {
 		}
 	}
 
+	// Let's first check to see if we already had an import for this path.
+	for _, imp := range f.Imports {
+		unquoted := imp.Path.Value[1 : len(imp.Path.Value)-1]
+		if unquoted == path {
+			// We already have this import and we don't need to add it. Return the name (if any)
+			// that it's already imported as.
+			if imp.Name == nil {
+				return ""
+			}
+			return imp.Name.Name
+		}
+	}
+
 	astutil.AddNamedImport(fset, mod.mutated, name, path)
 	imp.filesByName[fileName] = mod
+	return name
 }
 
 func (imp *Importer) Rewrite(pass *analysis.Pass) error {

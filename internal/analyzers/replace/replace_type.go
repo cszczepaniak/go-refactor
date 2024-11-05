@@ -116,9 +116,9 @@ func doTypeReplacement(
 				if pass.Pkg.Path() == replacement.Pkg {
 					replacementStr = replacement.name
 				} else {
-					importer.Add(pass.Fset, stack[0].(*ast.File), importAlias, replacement.Pkg)
+					addedName := importer.Add(pass.Fset, stack[0].(*ast.File), importAlias, replacement.Pkg)
 					// Use the import alias if provided, otherwise the name of the import.
-					replacementStr = cmp.Or(importAlias, importName) + "." + replacement.name
+					replacementStr = cmp.Or(addedName, importName) + "." + replacement.name
 				}
 
 				err = analyzeutil.ReplaceNode(
