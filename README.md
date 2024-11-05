@@ -7,19 +7,21 @@ Currently, the best way to install `go-refactor` is to clone the repository and 
 
 # Supported Refactorings
 
-## `replace`
-`replace` is used to replace a function call with some transformation of it. See example usages
+## `replacecall`
+`replacecall` is used to replace function calls with some transformation of those calls. See example usages
 below.
 
 ```shell
 # The arguments are available as metavariables.
-go-refactor replace --func github.com/cszczepaniak/go-refactor/internal/analyzers/replace.New
---replacement 'NewWithAnotherArg("another argument", $arg0)' ./...
+go-refactor replacecall \
+    --func github.com/cszczepaniak/go-refactor/internal/analyzers/replace.New \
+    --replacement 'NewWithAnotherArg("another argument", $arg0)' ./...
 
 # You can also specify that a new import is needed. This will add
 # "github.com/cszczepaniak/another/pkg" as an import and expand to "pkgname."
-go-refactor replace --func github.com/cszczepaniak/go-refactor/internal/analyzers/replace.New
---replacement '$pkg(github.com/cszczepaniak/another/pkg,pkgname).New($arg0)' ./...
+go-refactor replacecall \
+    --func github.com/cszczepaniak/go-refactor/internal/analyzers/replace.New \
+    --replacement '$pkg(github.com/cszczepaniak/another/pkg,pkgname).New($arg0)' ./...
 ```
 
 There are metavariables available within the replacement string. The table below enumerates them.
@@ -33,7 +35,20 @@ There are metavariables available within the replacement string. The table below
 | `$pkg(path,name,alias)` | A symbol from another package. An import with the given alias will be added for the package if needed. |
 
 
-## `move`
-`move` is used to move a type (and all of its methods, and optionally constructors) to a different
-package and updates all references elsewhere to refer to it by its new name.
-...it's not currently implemented.
+## `replacetype`
+`replacetype` is used to replace references to a type with references to another type. This includes
+struct fields, function input/output arguments, var declarations, type casts, etc. See example
+usages below.
+
+```shell
+# A simple replacement of one type with another
+go-refactor replacetype \
+    --type github.com/cszczepaniak/go-refactor/internal/analyzers/replace.TypeA \
+    --replacement github.com/cszczepaniak/go-refactor/internal/analyzers/replace.TypeB ./...
+
+# Optionally specify an import alias to use when importing the package with the new type.
+go-refactor replacetype \
+    --type github.com/cszczepaniak/go-refactor/internal/analyzers/replace.TypeA \
+    --replacement github.com/cszczepaniak/go-refactor/internal/analyzers/anotherpkg.TypeB \
+    --import-alias aliasme ./...
+```
