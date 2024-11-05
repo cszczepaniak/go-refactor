@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cszczepaniak/go-refactor/internal/analyzeutil"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
@@ -72,13 +73,19 @@ func New(dummy string) *analysis.Analyzer {
 						return false
 					}
 
+					var msg string
+					msg, err = analyzeutil.PrintReplacement(pass.Fset, callExpr, replacement)
+					if err != nil {
+						return false
+					}
+
 					pass.Report(
 						analysis.Diagnostic{
 							Pos:     callExpr.Pos(),
 							End:     callExpr.End(),
-							Message: "replace the function call",
+							Message: msg,
 							SuggestedFixes: []analysis.SuggestedFix{{
-								Message: "replace the function call",
+								Message: msg,
 								TextEdits: []analysis.TextEdit{{
 									Pos:     callExpr.Pos(),
 									End:     callExpr.End(),
