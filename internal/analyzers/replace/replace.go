@@ -65,6 +65,16 @@ func New(dummy string) *analysis.Analyzer {
 						return true
 					}
 
+					switch {
+					case parsedFunc.matchesTopLevel(obj):
+						for imp := range r.imports() {
+							importer.Add(pass.Fset, stack[0].(*ast.File), imp.alias, imp.path)
+						}
+					case parsedFunc.matchesReceiver(obj):
+					default:
+						return true
+					}
+
 					var replacement string
 					replacement, err = r.print(pass.Fset, callExpr)
 					if err != nil {
@@ -74,10 +84,6 @@ func New(dummy string) *analysis.Analyzer {
 					err = analyzeutil.ReplaceNode(pass, callExpr, replacement)
 					if err != nil {
 						return false
-					}
-
-					for imp := range r.imports() {
-						importer.Add(pass.Fset, stack[0].(*ast.File), imp.alias, imp.path)
 					}
 
 					return true
@@ -105,6 +111,16 @@ type funcSpec struct {
 
 func (s funcSpec) matchesTopLevel(obj types.Object) bool {
 	return obj != nil && obj.Name() == s.name && obj.Pkg().Path() == s.pkg
+}
+
+func (s funcSpec) matchesReceiver(obj types.Object) bool {
+	sig, ok := obj.(*types.Func)
+	if !ok {
+		return false
+	}
+
+	recv := sig.Signature().Recv()
+	return recv != nil && recv.Pkg().Path() == s.pkg && recv.Name() == s.recv && obj.Name() == s.name
 }
 
 func parseFunction(input string) (funcSpec, error) {
