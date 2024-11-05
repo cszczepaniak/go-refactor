@@ -15,6 +15,12 @@ func main() {
 	app := &cli.App{
 		Name: "go-refactor",
 		Args: true,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "verbose",
+				Aliases: []string{"v"},
+			},
+		},
 		Commands: []*cli.Command{{
 			Name: "replace",
 			Flags: []cli.Flag{
@@ -45,7 +51,10 @@ func main() {
 					return err
 				}
 
-				fmt.Println(out.Count)
+				if ctx.Bool("verbose") {
+					fmt.Printf("%d issues found and fixed\n", out.Count)
+				}
+
 				return nil
 			},
 		}},
