@@ -2,6 +2,8 @@ package replace
 
 import "github.com/cszczepaniak/go-refactor/internal/analyzers/replace/bar"
 
+type ReplaceInPackage struct{}
+
 func aFunction(a, b bar.Something) {}
 
 type aType struct {
