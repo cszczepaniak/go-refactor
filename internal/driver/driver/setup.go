@@ -102,7 +102,7 @@ func (d Driver) execute(subcmd string, flags map[string]string, args []string, d
 
 	switch state.ExitCode() {
 	case 0:
-		return nil, ErrNoResults
+		return nil, fmt.Errorf("execute: %w\n%s", ErrNoResults, output.Output())
 	case 3:
 		// Code 3 is returned when diagnostics were reported, this is our success case (when we had
 		// something to fix).
