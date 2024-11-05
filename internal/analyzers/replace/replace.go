@@ -1,8 +1,10 @@
 package replace
 
 import (
+	"cmp"
 	"errors"
 	"flag"
+	"fmt"
 	"go/ast"
 	"go/types"
 	"os"
@@ -16,8 +18,11 @@ import (
 
 type flags struct {
 	function    string
-	typeName    string
 	replacement string
+
+	typeName               string
+	typeReplacementPackage string
+	aliasTypeReplacement   bool
 }
 
 func (f flags) validate() error {
@@ -36,11 +41,26 @@ func (f flags) validate() error {
 	return nil
 }
 
+func (f flags) parseSymbolSpec() (symbolSpec, error) {
+	spec, err := parseSymbolSpec(cmp.Or(f.function, f.typeName))
+	if err != nil {
+		return symbolSpec{}, err
+	}
+
+	if spec.recv != "" && f.typeName != "" {
+		return symbolSpec{}, errors.New("receiver name not supported for type replacements")
+	}
+
+	return spec, nil
+}
+
 func New(dummy string) *analysis.Analyzer {
 	var flags flags
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flagSet.StringVar(&flags.function, "func", "", "The function to replace. Format is 'github.com/package/path.FunctionName'")
 	flagSet.StringVar(&flags.typeName, "type", "", "The type to replace. Format is 'github.com/package/path.TypeName'")
+	flagSet.StringVar(&flags.typeReplacementPackage, "package", "", "The name of the package containing the replacement type. This is the alias that will be added to the import if --alias-type-replacement is set.")
+	flagSet.BoolVar(&flags.aliasTypeReplacement, "alias-type-replacement", false, "Whether or not to add the import for the replacement type with an alias.")
 	flagSet.StringVar(&flags.replacement, "replacement", "", "The replacement string. Placeholders are available (like $arg0).")
 
 	return &analysis.Analyzer{
@@ -53,17 +73,32 @@ func New(dummy string) *analysis.Analyzer {
 				return nil, err
 			}
 
-			r, err := parseReplacement(flags.replacement)
+			importer := &analyzeutil.Importer{}
+			inspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+
+			spec, err := flags.parseSymbolSpec()
 			if err != nil {
 				return nil, err
 			}
 
-			importer := &analyzeutil.Importer{}
-			inspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-
 			switch {
 			case flags.function != "":
-				err = doFunctionReplacement(pass, flags.function, inspector, importer, r)
+				r, err := parseReplacement(flags.replacement)
+				if err != nil {
+					return nil, err
+				}
+
+				err = doFunctionReplacement(pass, spec, inspector, importer, r)
+			case flags.typeName != "":
+				replacement, err := parseSymbolSpec(flags.replacement)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing type replacement (must be a package + symbol): %w", err)
+				}
+				alias := flags.typeReplacementPackage
+				if !flags.aliasTypeReplacement {
+					alias = ""
+				}
+				err = doTypeReplacement(pass, spec, replacement, alias, inspector, importer)
 			default:
 				return nil, errors.New("dev error: unknown case")
 			}
@@ -80,16 +115,12 @@ func New(dummy string) *analysis.Analyzer {
 
 func doFunctionReplacement(
 	pass *analysis.Pass,
-	function string,
+	parsedFunc symbolSpec,
 	inspector *inspector.Inspector,
 	importer *analyzeutil.Importer,
 	r parsedReplacement,
 ) error {
-	parsedFunc, err := parseFunction(function)
-	if err != nil {
-		return err
-	}
-
+	var err error
 	inspector.WithStack(
 		[]ast.Node{&ast.CallExpr{}},
 		func(n ast.Node, push bool, stack []ast.Node) bool {
@@ -112,11 +143,11 @@ func doFunctionReplacement(
 			obj := pass.TypesInfo.ObjectOf(name)
 
 			switch {
-			case parsedFunc.matchesTopLevel(obj):
+			case parsedFunc.matchesTopLevelSymbol(obj):
 				for imp := range r.imports() {
 					importer.Add(pass.Fset, stack[0].(*ast.File), imp.alias, imp.path)
 				}
-			case parsedFunc.matchesReceiver(obj):
+			case parsedFunc.matchesFuncReceiver(obj):
 			default:
 				return true
 			}
@@ -135,24 +166,64 @@ func doFunctionReplacement(
 			return true
 		},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
-type funcSpec struct {
+func doTypeReplacement(
+	pass *analysis.Pass,
+	spec symbolSpec,
+	replacement symbolSpec,
+	replacementPackageName string,
+	inspector *inspector.Inspector,
+	importer *analyzeutil.Importer,
+) error {
+	var err error
+	inspector.WithStack(
+		[]ast.Node{&ast.Field{}},
+		func(n ast.Node, push bool, stack []ast.Node) bool {
+			if !push {
+				return false
+			}
+
+			field := n.(*ast.Field)
+
+			sel, ok := field.Type.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+
+			obj := pass.TypesInfo.ObjectOf(sel.Sel)
+
+			switch {
+			case spec.matchesTopLevelSymbol(obj):
+				importer.Add(pass.Fset, stack[0].(*ast.File), replacementPackageName, replacement.pkg)
+				err = analyzeutil.ReplaceNode(pass, field.Type, replacementPackageName+"."+replacement.name)
+
+				// Whether or not there's an error, there's no need to descend further into a Field.
+				return false
+			default:
+				return true
+			}
+		},
+	)
+
+	return err
+}
+
+type symbolSpec struct {
 	pkg  string
-	recv string
 	name string
+
+	// recv is only set for function specs
+	recv string
 }
 
-func (s funcSpec) matchesTopLevel(obj types.Object) bool {
+func (s symbolSpec) matchesTopLevelSymbol(obj types.Object) bool {
 	return obj != nil && obj.Name() == s.name && obj.Pkg() != nil && obj.Pkg().Path() == s.pkg
 }
 
-func (s funcSpec) matchesReceiver(obj types.Object) bool {
+func (s symbolSpec) matchesFuncReceiver(obj types.Object) bool {
 	if obj.Name() != s.name {
 		return false
 	}
@@ -175,10 +246,10 @@ func (s funcSpec) matchesReceiver(obj types.Object) bool {
 	return recvTyp.Obj().Pkg().Path() == s.pkg && recvTyp.Obj().Name() == s.recv
 }
 
-func parseFunction(input string) (funcSpec, error) {
+func parseSymbolSpec(input string) (symbolSpec, error) {
 	dot := strings.LastIndex(input, ".")
 	if dot == -1 {
-		return funcSpec{}, errors.New("function must be of form <package path>.<receiver (optional)>.<name>")
+		return symbolSpec{}, errors.New("spec must be of form <package path>.<receiver (optional)>.<name>")
 	}
 
 	rest, name := input[:dot], input[dot+1:]
@@ -187,14 +258,14 @@ func parseFunction(input string) (funcSpec, error) {
 
 	if slash > dot {
 		// The only dots are in the package path, there is no receiver name.
-		return funcSpec{
+		return symbolSpec{
 			pkg:  rest,
 			name: name,
 		}, nil
 	}
 
 	pkg, recv := rest[:dot], rest[dot+1:]
-	return funcSpec{
+	return symbolSpec{
 		pkg:  pkg,
 		recv: recv,
 		name: name,
