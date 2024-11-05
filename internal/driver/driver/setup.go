@@ -2,10 +2,12 @@ package driver
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 //go:embed bin/driver
@@ -41,6 +43,10 @@ func Setup() (Driver, error) {
 	return d, nil
 }
 
+var (
+	ErrNoResults = errors.New("no results")
+)
+
 func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (string, error) {
 	preparedArgs := make([]string, 0, len(flags)*2+2+len(args))
 	preparedArgs = append(preparedArgs, "-"+subcmd, "-fix")
@@ -49,12 +55,31 @@ func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (
 	}
 	preparedArgs = append(preparedArgs, args...)
 
-	out, err := exec.Command(d.exePath, preparedArgs...).CombinedOutput()
+	output := &strings.Builder{}
+	cmd := exec.Command(d.exePath, preparedArgs...)
+	cmd.Stdout = output
+	cmd.Stderr = output
+
+	err := cmd.Start()
 	if err != nil {
-		return "", fmt.Errorf("error running driver: %w\n%s", err, string(out))
+		return "", err
 	}
 
-	return string(out), nil
+	state, err := cmd.Process.Wait()
+	if err != nil {
+		return "", err
+	}
+
+	switch state.ExitCode() {
+	case 0:
+		return "", ErrNoResults
+	case 3:
+		// Code 3 is returned when diagnostics were reported, this is our success case (when we had
+		// something to fix).
+		return output.String(), nil
+	default:
+		return "", fmt.Errorf("error running driver: %s", output)
+	}
 }
 
 func (d Driver) Cleanup() error {
