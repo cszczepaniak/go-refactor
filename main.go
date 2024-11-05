@@ -45,7 +45,7 @@ func main() {
 					return err
 				}
 
-				fmt.Println(out)
+				fmt.Println(out.Count)
 				return nil
 			},
 		}},

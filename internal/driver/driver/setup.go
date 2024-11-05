@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"bytes"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -47,7 +48,27 @@ var (
 	ErrNoResults = errors.New("no results")
 )
 
-func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (string, error) {
+type Result struct {
+	output *strings.Builder
+	Count  int
+}
+
+func (r *Result) Output() string {
+	return r.output.String()
+}
+
+func (r *Result) Write(b []byte) (int, error) {
+	if r.output == nil {
+		r.output = &strings.Builder{}
+	}
+	if r.Count == 0 {
+		r.Count++
+	}
+	r.Count += bytes.Count(b, []byte{'\n'})
+	return r.output.Write(b)
+}
+
+func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (*Result, error) {
 	preparedArgs := make([]string, 0, len(flags)*2+2+len(args))
 	preparedArgs = append(preparedArgs, "-"+subcmd, "-fix")
 	for k, v := range flags {
@@ -55,30 +76,31 @@ func (d Driver) Execute(subcmd string, flags map[string]string, args []string) (
 	}
 	preparedArgs = append(preparedArgs, args...)
 
-	output := &strings.Builder{}
+	output := &Result{}
+	stderr := &strings.Builder{}
 	cmd := exec.Command(d.exePath, preparedArgs...)
 	cmd.Stdout = output
-	cmd.Stderr = output
+	cmd.Stderr = stderr
 
 	err := cmd.Start()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	state, err := cmd.Process.Wait()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	switch state.ExitCode() {
 	case 0:
-		return "", ErrNoResults
+		return nil, ErrNoResults
 	case 3:
 		// Code 3 is returned when diagnostics were reported, this is our success case (when we had
 		// something to fix).
-		return output.String(), nil
+		return output, nil
 	default:
-		return "", fmt.Errorf("error running driver: %s", output)
+		return nil, fmt.Errorf("error running driver: %s", stderr)
 	}
 }
 
