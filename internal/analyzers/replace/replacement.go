@@ -38,6 +38,8 @@ func parseReplacement(replacementStr string) (parsedReplacement, error) {
 				}
 
 				pr.replacers = append(pr.replacers, argReplacer{index: idx})
+			case "recvdot":
+				pr.replacers = append(pr.replacers, recvReplacer{})
 			case "recv":
 				pr.replacers = append(pr.replacers, recvReplacer{})
 			case "pkg":
@@ -178,7 +180,9 @@ func (ar argReplacer) print(fset *token.FileSet, call *ast.CallExpr) (string, er
 	return analyzeutil.FormatNode(fset, call.Args[ar.index])
 }
 
-type recvReplacer struct{}
+type recvReplacer struct {
+	dot bool
+}
 
 func (r recvReplacer) print(fset *token.FileSet, call *ast.CallExpr) (string, error) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
@@ -186,5 +190,13 @@ func (r recvReplacer) print(fset *token.FileSet, call *ast.CallExpr) (string, er
 		return "", nil
 	}
 
-	return analyzeutil.FormatNode(fset, sel.X)
+	formatted, err := analyzeutil.FormatNode(fset, sel.X)
+	if err != nil {
+		return "", err
+	}
+
+	if r.dot {
+		return formatted + ".", nil
+	}
+	return formatted, nil
 }

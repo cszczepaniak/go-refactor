@@ -23,5 +23,6 @@ There are metavariables available within the replacement string. The table below
 | - | - |
 | `$arg<n>` | The nth input argument of the function (0-indexed). Examples: `$arg0`, `$arg11` |
 | `$recv` | The receiver of the function call. If the call has no receiver, it's an empty string. |
+| `$recvdot` | Same as `$recv`, but followed by `.` if the receiver is present. This is useful for replacing top-level functions that may be imported under different aliases in different packages and/or replacing calls to functions in their own package. For example, when replacing a function called `Example` in a package called `mypackage`, `$recvdotNewExample` will expand to `NewExample` within `mypackage`, `mypackage.NewExample` in a package that imports `mypackage` with no alias, and `mypackage2.NewExample` in a package that imports `mypackage` with an alias of `mypackage2`. |
 | `$pkg(path,name)` | A symbol from another package. An import will be added for the package if needed. |
 | `$pkg(path,name,alias)` | A symbol from another package. An import with the given alias will be added for the package if needed. |
