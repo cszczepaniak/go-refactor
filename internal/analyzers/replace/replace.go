@@ -14,26 +14,46 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
+type flags struct {
+	function    string
+	typeName    string
+	replacement string
+}
+
+func (f flags) validate() error {
+	if f.replacement == "" {
+		return errors.New("replacement must be provided")
+	}
+
+	if f.function == "" && f.typeName == "" {
+		return errors.New("either function or type must be provided")
+	}
+
+	if f.function != "" && f.typeName != "" {
+		return errors.New("either function or type must be provided, but not both")
+	}
+
+	return nil
+}
+
 func New(dummy string) *analysis.Analyzer {
+	var flags flags
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	function := flagSet.String("func", "", "The function to replace. Format is 'github.com/package/path.FunctionName'")
-	replacement := flagSet.String("replacement", "", "The replacement string. Placeholders are available (like $arg0).")
+	flagSet.StringVar(&flags.function, "func", "", "The function to replace. Format is 'github.com/package/path.FunctionName'")
+	flagSet.StringVar(&flags.typeName, "type", "", "The type to replace. Format is 'github.com/package/path.TypeName'")
+	flagSet.StringVar(&flags.replacement, "replacement", "", "The replacement string. Placeholders are available (like $arg0).")
 
 	return &analysis.Analyzer{
 		Name:  "replace",
 		Doc:   "Replace a function call with something else.",
 		Flags: *flagSet,
 		Run: func(pass *analysis.Pass) (interface{}, error) {
-			if *function == "" {
-				return nil, errors.New("function is required")
-			}
-
-			parsedFunc, err := parseFunction(*function)
+			err := flags.validate()
 			if err != nil {
 				return nil, err
 			}
 
-			r, err := parseReplacement(*replacement)
+			r, err := parseReplacement(flags.replacement)
 			if err != nil {
 				return nil, err
 			}
@@ -41,53 +61,11 @@ func New(dummy string) *analysis.Analyzer {
 			importer := &analyzeutil.Importer{}
 			inspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
-			inspector.WithStack(
-				[]ast.Node{&ast.CallExpr{}},
-				func(n ast.Node, push bool, stack []ast.Node) bool {
-					if !push {
-						return false
-					}
-
-					callExpr := n.(*ast.CallExpr)
-
-					var name *ast.Ident
-					switch fn := callExpr.Fun.(type) {
-					case *ast.Ident:
-						name = fn
-					case *ast.SelectorExpr:
-						name = fn.Sel
-					default:
-						return true
-					}
-
-					obj := pass.TypesInfo.ObjectOf(name)
-
-					switch {
-					case parsedFunc.matchesTopLevel(obj):
-						for imp := range r.imports() {
-							importer.Add(pass.Fset, stack[0].(*ast.File), imp.alias, imp.path)
-						}
-					case parsedFunc.matchesReceiver(obj):
-					default:
-						return true
-					}
-
-					var replacement string
-					replacement, err = r.print(pass.Fset, callExpr)
-					if err != nil {
-						return false
-					}
-
-					err = analyzeutil.ReplaceNode(pass, callExpr, replacement)
-					if err != nil {
-						return false
-					}
-
-					return true
-				},
-			)
-			if err != nil {
-				return nil, err
+			switch {
+			case flags.function != "":
+				err = doFunctionReplacement(pass, flags.function, inspector, importer, r)
+			default:
+				return nil, errors.New("dev error: unknown case")
 			}
 
 			importer.Rewrite(pass)
@@ -98,6 +76,70 @@ func New(dummy string) *analysis.Analyzer {
 			inspect.Analyzer,
 		},
 	}
+}
+
+func doFunctionReplacement(
+	pass *analysis.Pass,
+	function string,
+	inspector *inspector.Inspector,
+	importer *analyzeutil.Importer,
+	r parsedReplacement,
+) error {
+	parsedFunc, err := parseFunction(function)
+	if err != nil {
+		return err
+	}
+
+	inspector.WithStack(
+		[]ast.Node{&ast.CallExpr{}},
+		func(n ast.Node, push bool, stack []ast.Node) bool {
+			if !push {
+				return false
+			}
+
+			callExpr := n.(*ast.CallExpr)
+
+			var name *ast.Ident
+			switch fn := callExpr.Fun.(type) {
+			case *ast.Ident:
+				name = fn
+			case *ast.SelectorExpr:
+				name = fn.Sel
+			default:
+				return true
+			}
+
+			obj := pass.TypesInfo.ObjectOf(name)
+
+			switch {
+			case parsedFunc.matchesTopLevel(obj):
+				for imp := range r.imports() {
+					importer.Add(pass.Fset, stack[0].(*ast.File), imp.alias, imp.path)
+				}
+			case parsedFunc.matchesReceiver(obj):
+			default:
+				return true
+			}
+
+			var replacement string
+			replacement, err = r.print(pass.Fset, callExpr)
+			if err != nil {
+				return false
+			}
+
+			err = analyzeutil.ReplaceNode(pass, callExpr, replacement)
+			if err != nil {
+				return false
+			}
+
+			return true
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type funcSpec struct {
