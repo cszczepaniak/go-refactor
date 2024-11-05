@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
-	"go/format"
 	"go/token"
 	"iter"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/cszczepaniak/go-refactor/internal/analyzeutil"
 )
 
 func parseReplacement(replacementStr string) (parsedReplacement, error) {
@@ -37,6 +38,8 @@ func parseReplacement(replacementStr string) (parsedReplacement, error) {
 				}
 
 				pr.replacers = append(pr.replacers, argReplacer{index: idx})
+			case "recv":
+				pr.replacers = append(pr.replacers, recvReplacer{})
 			case "pkg":
 				var err error
 				rest, err = expectRune(rest, '(')
@@ -172,11 +175,16 @@ func (ar argReplacer) print(fset *token.FileSet, call *ast.CallExpr) (string, er
 		return "", fmt.Errorf("index was %d but there are only %d arguments", ar.index, len(call.Args))
 	}
 
-	dst := &strings.Builder{}
-	err := format.Node(dst, fset, call.Args[ar.index])
-	if err != nil {
-		return "", err
+	return analyzeutil.FormatNode(fset, call.Args[ar.index])
+}
+
+type recvReplacer struct{}
+
+func (r recvReplacer) print(fset *token.FileSet, call *ast.CallExpr) (string, error) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return "", nil
 	}
 
-	return dst.String(), nil
+	return analyzeutil.FormatNode(fset, sel.X)
 }
