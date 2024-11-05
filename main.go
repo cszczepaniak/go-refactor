@@ -33,8 +33,6 @@ func main() {
 					return errors.New("dev error: driver not found")
 				}
 
-				fmt.Println("ARGS", ctx.Args().Slice())
-
 				out, err := d.Execute(
 					"replace",
 					map[string]string{
