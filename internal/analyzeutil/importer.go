@@ -42,8 +42,9 @@ func (imp *Importer) Add(fset *token.FileSet, f *ast.File, name, path string) st
 		}
 	}
 
-	// Let's first check to see if we already had an import for this path.
-	for _, imp := range f.Imports {
+	// Let's first check to see if we already had an import for this path. Note that we'll check the
+	// modified file because we may have added this import in a previous call to Add.
+	for _, imp := range mod.mutated.Imports {
 		unquoted := imp.Path.Value[1 : len(imp.Path.Value)-1]
 		if unquoted == path {
 			// We already have this import and we don't need to add it. Return the name (if any)
